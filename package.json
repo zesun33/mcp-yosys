@@ -1,0 +1,26 @@
+{
+  "name": "@zesun33/mcp-yosys",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for Yosys RTL synthesis, cell statistics, and latch triage",
+  "type": "module",
+  "bin": {
+    "mcp-yosys": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:unit": "tsx --test tests/stat_parser.test.ts tests/check_parser.test.ts tests/contract.test.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
