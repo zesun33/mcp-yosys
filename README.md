@@ -62,14 +62,14 @@
   "success": true,
   "topModule": "counter",
   "target": "generic",
-  "cellCount": 8,
+  "cellCount": 10,
   "cellsByType": {
-    "$_ANDNOT_": 1,
     "$_AND_": 2,
-    "$_DFF_P_": 4,
-    "$_XOR_": 1
+    "$_DFFE_PN0P_": 4,
+    "$_NOT_": 1,
+    "$_XOR_": 3
   },
-  "wireCount": 10,
+  "wireCount": 8,
   "warnings": [],
   "errors": []
 }
