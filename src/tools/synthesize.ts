@@ -6,7 +6,8 @@ import { YosysSynthesizeResult } from "../parsers/types.js";
 export interface SynthesizeOptions {
   verilogSources: string[];
   topModule: string;
-  target?: "generic" | "ice40" | "sky130";
+  target?: "generic" | "ice40" | "sky130" | "nangate45";
+  libertyFile?: string;
   flatten?: boolean;
   outputNetlist?: string;
   cwd?: string;
@@ -37,19 +38,39 @@ export async function runYosysSynthesize(
   }
 
   // 4. Synthesis pass based on target
+  let activeLiberty = options.libertyFile;
   if (target === "ice40") {
     scriptParts.push(`synth_ice40 -top ${options.topModule}`);
+  } else if (target === "sky130") {
+    scriptParts.push(`synth_sky130 -top ${options.topModule}`);
+  } else if (target === "nangate45") {
+    if (!activeLiberty) {
+      activeLiberty = "/opt/platforms/nangate45/NangateOpenCellLibrary_typical.lib";
+    }
+    scriptParts.push(`synth -top ${options.topModule}`);
+    scriptParts.push(`dfflibmap -liberty ${activeLiberty}`);
+    scriptParts.push(`abc -liberty ${activeLiberty}`);
+    scriptParts.push("clean");
+  } else if (activeLiberty) {
+    scriptParts.push(`synth -top ${options.topModule}`);
+    scriptParts.push(`dfflibmap -liberty ${activeLiberty}`);
+    scriptParts.push(`abc -liberty ${activeLiberty}`);
+    scriptParts.push("clean");
   } else {
     // Generic logic synthesis
     scriptParts.push(`synth -top ${options.topModule}`);
   }
 
   // 5. Stat JSON
-  scriptParts.push("stat -json");
+  if (activeLiberty) {
+    scriptParts.push(`stat -liberty ${activeLiberty} -json`);
+  } else {
+    scriptParts.push("stat -json");
+  }
 
   // 6. Write netlist if requested
   if (options.outputNetlist) {
-    scriptParts.push(`write_verilog ${options.outputNetlist}`);
+    scriptParts.push(`write_verilog -noattr ${options.outputNetlist}`);
   }
 
   const yosysScript = scriptParts.join("; ");

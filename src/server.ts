@@ -44,8 +44,12 @@ export function createServer(): Server {
           },
           target: {
             type: "string",
-            enum: ["generic", "ice40", "sky130"],
+            enum: ["generic", "ice40", "sky130", "nangate45"],
             description: "Target architecture/library (default: 'generic').",
+          },
+          liberty_file: {
+            type: "string",
+            description: "Optional path to Liberty (.lib) standard cell timing library.",
           },
           flatten: {
             type: "boolean",
@@ -145,7 +149,8 @@ export function createServer(): Server {
       if (name === "yosys_synthesize") {
         const sources = args.verilog_sources as string[];
         const top = args.top_module as string;
-        const target = args.target as "generic" | "ice40" | "sky130" | undefined;
+        const target = args.target as "generic" | "ice40" | "sky130" | "nangate45" | undefined;
+        const libertyFile = args.liberty_file as string | undefined;
         const flatten = args.flatten as boolean | undefined;
         const outputNetlist = args.output_netlist as string | undefined;
         const cwd = args.cwd as string | undefined;
@@ -155,6 +160,7 @@ export function createServer(): Server {
           verilogSources: sources,
           topModule: top,
           target,
+          libertyFile,
           flatten,
           outputNetlist,
           cwd,
