@@ -47,7 +47,7 @@ export function createServer(): Server {
             type: "string",
             enum: ["generic", "ice40", "xilinx", "intel", "sky130", "nangate45"],
             description:
-              "Target architecture/library (default: 'generic'). 'sky130' needs a baked Sky130 PDK and currently errors honestly.",
+              "Target architecture/library (default: 'generic'). 'sky130' maps to sky130_fd_sc_hd via a host-side volare PDK (MCP_YOSYS_PDK_ROOT, tt_100C_1v80) and errors honestly without one.",
           },
           liberty_file: {
             type: "string",

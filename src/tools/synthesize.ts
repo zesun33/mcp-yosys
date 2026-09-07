@@ -17,6 +17,17 @@ export interface SynthesizeOptions {
   timeoutMs?: number;
 }
 
+// Default Sky130 liberty: container path /pdk/... when a PDK is mounted,
+// host path when running on bare metal. Undefined when no PDK is visible.
+function defaultSky130Liberty(runner: ToolRunner): string | undefined {
+  const rel = "sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_100C_1v80.lib";
+  if (runner.getRuntime() === "host") {
+    const root = process.env.MCP_YOSYS_PDK_ROOT || process.env.PDK_ROOT || "";
+    return root ? path.join(path.resolve(root), rel) : undefined;
+  }
+  return runner.getPdkDir() ? `/pdk/${rel}` : undefined;
+}
+
 export async function runYosysSynthesize(
   runner: ToolRunner,
   options: SynthesizeOptions
@@ -49,22 +60,30 @@ export async function runYosysSynthesize(
   } else if (target === "intel") {
     scriptParts.push(`synth_intel -top ${options.topModule}`);
   } else if (target === "sky130") {
-    // Yosys 0.38 has no synth_sky130 and the image bakes no Sky130 PDK yet
-    // (see volare); fail honestly instead of emitting a doomed script.
-    return {
-      success: false,
-      topModule: options.topModule,
-      target,
-      cellCount: 0,
-      cellsByType: {},
-      wireCount: 0,
-      warnings: [],
-      errors: [
-        "Target 'sky130' needs a Sky130 PDK baked into the image, which is not installed yet. Use 'nangate45' or 'generic', or install the PDK with volare (see eda-docker-images).",
-      ],
-      rawStdout: "",
-      rawStderr: "",
-    };
+    // Sky130 via host-side volare PDK (mounted at /pdk), same convention as
+    // mcp-gds. Default corner: tt_100C_1v80.
+    const liberty = options.libertyFile || defaultSky130Liberty(runner);
+    if (!liberty) {
+      return {
+        success: false,
+        topModule: options.topModule,
+        target,
+        cellCount: 0,
+        cellsByType: {},
+        wireCount: 0,
+        warnings: [],
+        errors: [
+          "Target 'sky130' needs the Sky130 PDK: set MCP_YOSYS_PDK_ROOT to a volare sky130 cache (the <sha> version dir), or pass libertyFile explicitly.",
+        ],
+        rawStdout: "",
+        rawStderr: "",
+      };
+    }
+    activeLiberty = liberty;
+    scriptParts.push(`synth -top ${options.topModule}`);
+    scriptParts.push(`dfflibmap -liberty ${activeLiberty}`);
+    scriptParts.push(`abc -liberty ${activeLiberty}`);
+    scriptParts.push("clean");
   } else if (target === "nangate45") {
     if (!activeLiberty) {
       activeLiberty = "/opt/platforms/nangate45/NangateOpenCellLibrary_typical.lib";

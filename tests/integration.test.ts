@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { ToolRunner } from "../src/runner.js";
 import { runYosysSynthesize } from "../src/tools/synthesize.js";
@@ -94,16 +95,49 @@ test("Integration: yosys_synthesize maps hierarchy_demo.v to xilinx and intel", 
   }
 });
 
-test("Integration: yosys_synthesize rejects sky130 without a baked PDK", async () => {
-  const res = await runYosysSynthesize(runner, {
+test("Integration: yosys_synthesize rejects sky130 without a visible PDK", async () => {
+  const savedYosys = process.env.MCP_YOSYS_PDK_ROOT;
+  const savedShared = process.env.PDK_ROOT;
+  delete process.env.MCP_YOSYS_PDK_ROOT;
+  delete process.env.PDK_ROOT;
+  try {
+    const res = await runYosysSynthesize(new ToolRunner(), {
+      verilogSources: ["counter.v"],
+      topModule: "counter",
+      target: "sky130",
+      cwd: fixturesDir,
+    });
+
+    assert.equal(res.success, false);
+    assert.ok(res.errors.some((e) => e.includes("Sky130")), `Expected Sky130 guidance, got: ${res.errors.join("; ")}`);
+  } finally {
+    if (savedYosys !== undefined) process.env.MCP_YOSYS_PDK_ROOT = savedYosys;
+    if (savedShared !== undefined) process.env.PDK_ROOT = savedShared;
+  }
+});
+
+const PDK_ROOT = process.env.MCP_YOSYS_PDK_ROOT || process.env.PDK_ROOT || "";
+const pdkIt = PDK_ROOT ? test : test.skip;
+
+pdkIt("Integration (PDK): yosys_synthesize maps counter to sky130_fd_sc_hd cells", async () => {
+  const res = await runYosysSynthesize(new ToolRunner(), {
     verilogSources: ["counter.v"],
     topModule: "counter",
     target: "sky130",
+    outputNetlist: "counter_sky130_tmp.v",
     cwd: fixturesDir,
   });
-
-  assert.equal(res.success, false);
-  assert.ok(res.errors.some((e) => e.includes("Sky130")), `Expected Sky130 guidance, got: ${res.errors.join("; ")}`);
+  try {
+    assert.equal(res.success, true, `sky130 synth failed: ${res.errors.join("; ")}`);
+    assert.ok(res.cellCount > 0, "sky130: expected cells");
+    assert.ok(
+      Object.keys(res.cellsByType).some((c) => c.startsWith("sky130_fd_sc_hd__")),
+      `sky130: expected sky130_fd_sc_hd__ cells, got: ${Object.keys(res.cellsByType).join(", ")}`
+    );
+    assert.ok(res.areaUm2 !== undefined && res.areaUm2 > 0, "sky130: expected areaUm2");
+  } finally {
+    await fs.rm(path.join(fixturesDir, "counter_sky130_tmp.v"), { force: true });
+  }
 });
 
 test("Integration: yosys_equiv proves alu_top against its own netlist", async () => {

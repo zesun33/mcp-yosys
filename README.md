@@ -97,7 +97,7 @@
 
 | Tool | Parameters | Engine | Description |
 | :--- | :--- | :--- | :--- |
-| `yosys_synthesize` | `verilog_sources: string[]`, `top_module: string`, `target?: "generic" \| "ice40" \| "xilinx" \| "intel" \| "sky130" \| "nangate45"`, `flatten?: boolean`, `output_netlist?: string`, `cwd?: string`, `timeout_ms?: number` | `yosys synth` | Synthesizes RTL design to generic gates, iCE40/Xilinx/Intel FPGAs, or Nangate45 standard cells (with `areaUm2`), returning structured cell counts. `sky130` needs a baked PDK and errors honestly until one ships. |
+| `yosys_synthesize` | `verilog_sources: string[]`, `top_module: string`, `target?: "generic" \| "ice40" \| "xilinx" \| "intel" \| "sky130" \| "nangate45"`, `flatten?: boolean`, `output_netlist?: string`, `cwd?: string`, `timeout_ms?: number` | `yosys synth` | Synthesizes RTL design to generic gates, iCE40/Xilinx/Intel FPGAs, Nangate45 standard cells, or Sky130 (`sky130_fd_sc_hd`, with `areaUm2`), returning structured cell counts. `sky130` needs a host-side volare PDK (`MCP_YOSYS_PDK_ROOT`, tt_100C_1v80 corner) and errors honestly without one. |
 | `yosys_check_latch` | `verilog_sources: string[]`, `top_module: string`, `cwd?: string`, `timeout_ms?: number` | `yosys check` | Fast RTL elaboration pass to detect inferred transparent latches, combinational loops, and multiple drivers with source line numbers. |
 | `yosys_equiv` | `gold_sources: string[]`, `gate_netlist: string`, `top_module: string`, `cwd?: string`, `timeout_ms?: number` | `equiv_make -make_assert` + `sat -verify` | Proves combinational equivalence (EQUIVALENT / NOT_EQUIVALENT / INCONCLUSIVE; sequential and latch designs report INCONCLUSIVE, never a false pass). |
 | `yosys_hierarchy` | `verilog_sources: string[]`, `top_module: string`, `cwd?: string`, `timeout_ms?: number` | `yosys hierarchy` | Analyzes module instantiation tree and verifies that no submodules or blackboxes are missing. |
@@ -117,6 +117,12 @@ To configure a custom container image or force local host execution:
 export MCP_YOSYS_IMAGE=localhost/zesun33/fpga    # Use FPGA image instead of ASIC
 export MCP_YOSYS_RUNTIME=host                    # Use host-installed yosys
 ```
+
+For Sky130 synthesis, point the server at a host-side volare PDK (same convention as `mcp-gds`; never baked into images):
+```bash
+export MCP_YOSYS_PDK_ROOT=/path/to/pdks/volare/sky130/versions/<sha>
+```
+The PDK dir mounts at `/pdk` and `target: "sky130"` maps to `sky130_fd_sc_hd` (tt_100C_1v80 corner).
 
 ---
 
