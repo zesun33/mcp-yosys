@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, "..");
 
 export interface RunOptions {
   cwd?: string;
@@ -19,10 +24,12 @@ export type RuntimeType = "podman" | "docker" | "host";
 export class ToolRunner {
   private runtime: RuntimeType;
   private imageName: string;
+  private platformsDir: string;
 
   constructor() {
     const envRuntime = process.env.MCP_YOSYS_RUNTIME as RuntimeType | undefined;
     this.imageName = process.env.MCP_YOSYS_IMAGE || "localhost/zesun33/asic";
+    this.platformsDir = path.resolve(projectRoot, "platforms");
 
     if (envRuntime && ["podman", "docker", "host"].includes(envRuntime)) {
       this.runtime = envRuntime;
@@ -72,6 +79,8 @@ export class ToolRunner {
       }
 
       containerArgs.push(
+        "-v",
+        `${this.platformsDir}:/opt/platforms:ro,Z`,
         "-v",
         `${cwd}:/workspace:Z`,
         "-w",

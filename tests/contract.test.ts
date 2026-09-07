@@ -17,6 +17,7 @@ test("MCP server registers required Yosys tools", async () => {
   assert.ok(toolNames.includes("yosys_synthesize"), "Should expose yosys_synthesize");
   assert.ok(toolNames.includes("yosys_check_latch"), "Should expose yosys_check_latch");
   assert.ok(toolNames.includes("yosys_hierarchy"), "Should expose yosys_hierarchy");
+  assert.ok(toolNames.includes("yosys_equiv"), "Should expose yosys_equiv");
   assert.ok(toolNames.includes("yosys_toolchain_info"), "Should expose yosys_toolchain_info");
 
   for (const tool of response.tools) {

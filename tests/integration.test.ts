@@ -5,6 +5,7 @@ import { ToolRunner } from "../src/runner.js";
 import { runYosysSynthesize } from "../src/tools/synthesize.js";
 import { runYosysCheckLatch } from "../src/tools/check.js";
 import { runYosysHierarchy } from "../src/tools/hierarchy.js";
+import { runYosysEquiv } from "../src/tools/equiv.js";
 import { getYosysToolchainInfo } from "../src/tools/toolchain.js";
 
 const runner = new ToolRunner();
@@ -61,4 +62,101 @@ test("Integration: yosys_hierarchy extracts module tree in hierarchy_demo.v", as
   assert.ok(res.modules.some((m) => m.name === "adder"));
   assert.ok(res.modules.some((m) => m.name === "sub"));
   assert.equal(res.missingModules.length, 0);
+});
+
+test("Integration: yosys_synthesize maps counter.v to Nangate45 with area", async () => {
+  const res = await runYosysSynthesize(runner, {
+    verilogSources: ["counter.v"],
+    topModule: "counter",
+    target: "nangate45",
+    outputNetlist: "counter_nangate_tmp.v",
+    cwd: fixturesDir,
+  });
+
+  assert.equal(res.success, true, `Nangate synth failed: ${res.errors.join("; ")}`);
+  assert.ok(res.cellCount > 0);
+  assert.ok(
+    typeof res.areaUm2 === "number" && res.areaUm2 > 0,
+    `Expected areaUm2 > 0, got ${res.areaUm2}`
+  );
+});
+
+test("Integration: yosys_synthesize maps hierarchy_demo.v to xilinx and intel", async () => {
+  for (const target of ["xilinx", "intel"] as const) {
+    const res = await runYosysSynthesize(runner, {
+      verilogSources: ["hierarchy_demo.v"],
+      topModule: "alu_top",
+      target,
+      cwd: fixturesDir,
+    });
+    assert.equal(res.success, true, `${target} synth failed: ${res.errors.join("; ")}`);
+    assert.ok(res.cellCount > 0, `${target}: expected cells`);
+  }
+});
+
+test("Integration: yosys_synthesize rejects sky130 without a baked PDK", async () => {
+  const res = await runYosysSynthesize(runner, {
+    verilogSources: ["counter.v"],
+    topModule: "counter",
+    target: "sky130",
+    cwd: fixturesDir,
+  });
+
+  assert.equal(res.success, false);
+  assert.ok(res.errors.some((e) => e.includes("Sky130")), `Expected Sky130 guidance, got: ${res.errors.join("; ")}`);
+});
+
+test("Integration: yosys_equiv proves alu_top against its own netlist", async () => {
+  const synth = await runYosysSynthesize(runner, {
+    verilogSources: ["hierarchy_demo.v"],
+    topModule: "alu_top",
+    target: "generic",
+    outputNetlist: "alu_top_gate_tmp.v",
+    cwd: fixturesDir,
+  });
+  assert.equal(synth.success, true);
+
+  const res = await runYosysEquiv(runner, {
+    goldSources: ["hierarchy_demo.v"],
+    gateNetlist: "alu_top_gate_tmp.v",
+    topModule: "alu_top",
+    cwd: fixturesDir,
+  });
+
+  assert.equal(res.verdict, "EQUIVALENT", `Expected EQUIVALENT: ${res.reason} ${res.errors.join("; ")}`);
+  assert.equal(res.success, true);
+  assert.ok(res.provedAsserts > 0, "Expected proven asserts");
+});
+
+test("Integration: yosys_equiv catches a swapped-mux mutant", async () => {
+  const res = await runYosysEquiv(runner, {
+    goldSources: ["hierarchy_demo.v"],
+    gateNetlist: "hierarchy_mutant.v",
+    topModule: "alu_top",
+    cwd: fixturesDir,
+  });
+
+  assert.equal(res.verdict, "NOT_EQUIVALENT");
+  assert.equal(res.success, true);
+});
+
+test("Integration: yosys_equiv is inconclusive on sequential counter", async () => {
+  const synth = await runYosysSynthesize(runner, {
+    verilogSources: ["counter.v"],
+    topModule: "counter",
+    target: "generic",
+    outputNetlist: "counter_gate_tmp.v",
+    cwd: fixturesDir,
+  });
+  assert.equal(synth.success, true);
+
+  const res = await runYosysEquiv(runner, {
+    goldSources: ["counter.v"],
+    gateNetlist: "counter_gate_tmp.v",
+    topModule: "counter",
+    cwd: fixturesDir,
+  });
+
+  assert.equal(res.verdict, "INCONCLUSIVE");
+  assert.equal(res.success, false);
 });

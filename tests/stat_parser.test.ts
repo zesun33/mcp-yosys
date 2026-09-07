@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseYosysStatJson, extractYosysWarnings } from "../src/parsers/stat.js";
+import { parseYosysStatJson, extractYosysWarnings, parseChipArea, stripPortRedeclarations } from "../src/parsers/stat.js";
 
 const sampleOutput = `
 Yosys 0.38+92 (git sha1 84116c9a3)
@@ -60,4 +60,33 @@ test("extractYosysWarnings captures latch and syntax warnings", () => {
   const warnings = extractYosysWarnings(sampleOutput, "");
   assert.equal(warnings.length, 1);
   assert.ok(warnings[0].includes("Latch inferred for signal"));
+});
+
+test("parseChipArea reads liberty stat area lines", () => {
+  const out = `   Number of cells:                 24
+   Chip area for module '\\counter': 123.456
+   Chip area for module 'other': 10.0
+`;
+  assert.equal(parseChipArea(out, "counter"), 123.456);
+  assert.equal(parseChipArea(out, "missing"), undefined);
+  assert.equal(parseChipArea("no area here", "counter"), undefined);
+});
+
+test("stripPortRedeclarations removes OpenROAD-incompatible port dups only", () => {
+  const nl = `module counter(clk, rst_n, en, count);
+  wire _00_;
+  input clk;
+  wire clk;
+  output [3:0] count;
+  reg [3:0] count;
+  wire [3:0] _02_;
+endmodule`;
+  const cleaned = stripPortRedeclarations(nl, "counter");
+  assert.ok(!cleaned.includes("wire clk;"), "port wire dup must go");
+  assert.ok(!cleaned.includes("reg [3:0] count;"), "port reg dup must go");
+  assert.ok(cleaned.includes("input clk;"), "port direction must stay");
+  assert.ok(cleaned.includes("output [3:0] count;"), "port direction must stay");
+  assert.ok(cleaned.includes("wire _00_;"), "internal nets must stay");
+  assert.ok(cleaned.includes("wire [3:0] _02_;"), "internal nets must stay");
+  assert.equal(stripPortRedeclarations(nl, "other_module"), nl);
 });

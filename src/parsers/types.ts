@@ -1,4 +1,5 @@
 export interface YosysStatModule {
+  area?: number;
   numWires: number;
   numWireBits: number;
   numPubWires: number;
@@ -23,6 +24,7 @@ export interface YosysSynthesizeResult {
   cellCount: number;
   cellsByType: Record<string, number>;
   wireCount: number;
+  areaUm2?: number;
   warnings: string[];
   errors: string[];
   netlistPath?: string;
@@ -60,6 +62,20 @@ export interface YosysHierarchyResult {
   modules: YosysHierarchyModule[];
   missingModules: string[];
   warnings: string[];
+  rawStdout: string;
+  rawStderr: string;
+}
+
+export type EquivVerdict = "EQUIVALENT" | "NOT_EQUIVALENT" | "INCONCLUSIVE";
+
+export interface YosysEquivResult {
+  success: boolean;
+  verdict: EquivVerdict;
+  topModule: string;
+  provedAsserts: number;
+  reason: string;
+  warnings: string[];
+  errors: string[];
   rawStdout: string;
   rawStderr: string;
 }

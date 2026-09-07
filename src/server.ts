@@ -8,6 +8,7 @@ import { ToolRunner } from "./runner.js";
 import { runYosysSynthesize } from "./tools/synthesize.js";
 import { runYosysCheckLatch } from "./tools/check.js";
 import { runYosysHierarchy } from "./tools/hierarchy.js";
+import { runYosysEquiv } from "./tools/equiv.js";
 import { getYosysToolchainInfo } from "./tools/toolchain.js";
 
 export function createServer(): Server {
@@ -16,7 +17,7 @@ export function createServer(): Server {
   const server = new Server(
     {
       name: "@zesun33/mcp-yosys",
-      version: "0.1.0",
+      version: "0.2.0",
     },
     {
       capabilities: {
@@ -29,7 +30,7 @@ export function createServer(): Server {
     {
       name: "yosys_synthesize",
       description:
-        "Synthesizes a Verilog/SystemVerilog design using Yosys, mapping to generic gates, iCE40 FPGA, or Sky130 standard cells, and returns structured cell counts and warnings.",
+        "Synthesizes a Verilog/SystemVerilog design using Yosys, mapping to generic gates, iCE40/Xilinx/Intel FPGAs, or Nangate45 standard cells (with area), and returns structured cell counts and warnings.",
       inputSchema: {
         type: "object",
         properties: {
@@ -44,8 +45,9 @@ export function createServer(): Server {
           },
           target: {
             type: "string",
-            enum: ["generic", "ice40", "sky130", "nangate45"],
-            description: "Target architecture/library (default: 'generic').",
+            enum: ["generic", "ice40", "xilinx", "intel", "sky130", "nangate45"],
+            description:
+              "Target architecture/library (default: 'generic'). 'sky130' needs a baked Sky130 PDK and currently errors honestly.",
           },
           liberty_file: {
             type: "string",
@@ -128,6 +130,38 @@ export function createServer(): Server {
       },
     },
     {
+      name: "yosys_equiv",
+      description:
+        "Proves combinational equivalence between golden RTL and a gate-level netlist (equiv_make + sat). Returns EQUIVALENT, NOT_EQUIVALENT, or INCONCLUSIVE (sequential/latch designs exceed the SAT backend and never fake a pass).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          gold_sources: {
+            type: "array",
+            items: { type: "string" },
+            description: "Golden RTL source files.",
+          },
+          gate_netlist: {
+            type: "string",
+            description: "Gate-level Verilog netlist to check against golden RTL.",
+          },
+          top_module: {
+            type: "string",
+            description: "Top module name (same in both designs).",
+          },
+          cwd: {
+            type: "string",
+            description: "Working directory where files reside.",
+          },
+          timeout_ms: {
+            type: "number",
+            description: "Maximum proof timeout in milliseconds (default: 120000).",
+          },
+        },
+        required: ["gold_sources", "gate_netlist", "top_module"],
+      },
+    },
+    {
       name: "yosys_toolchain_info",
       description:
         "Returns active container/host runtime and version information for the Yosys synthesis engine.",
@@ -149,7 +183,15 @@ export function createServer(): Server {
       if (name === "yosys_synthesize") {
         const sources = args.verilog_sources as string[];
         const top = args.top_module as string;
-        const target = args.target as "generic" | "ice40" | "sky130" | "nangate45" | undefined;
+        const target =
+          args.target as
+            | "generic"
+            | "ice40"
+            | "xilinx"
+            | "intel"
+            | "sky130"
+            | "nangate45"
+            | undefined;
         const libertyFile = args.liberty_file as string | undefined;
         const flatten = args.flatten as boolean | undefined;
         const outputNetlist = args.output_netlist as string | undefined;
@@ -201,6 +243,20 @@ export function createServer(): Server {
           topModule: top,
           cwd,
           timeoutMs,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(res, null, 2) }],
+        };
+      }
+
+      if (name === "yosys_equiv") {
+        const res = await runYosysEquiv(runner, {
+          goldSources: args.gold_sources as string[],
+          gateNetlist: args.gate_netlist as string,
+          topModule: args.top_module as string,
+          cwd: args.cwd as string | undefined,
+          timeoutMs: args.timeout_ms as number | undefined,
         });
 
         return {

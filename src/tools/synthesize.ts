@@ -1,12 +1,15 @@
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { ToolRunner } from "../runner.js";
-import { parseYosysStatJson, extractYosysWarnings } from "../parsers/stat.js";
+import { parseYosysStatJson, extractYosysWarnings, parseChipArea, stripPortRedeclarations } from "../parsers/stat.js";
 import { YosysSynthesizeResult } from "../parsers/types.js";
+
+export type YosysTarget = "generic" | "ice40" | "xilinx" | "intel" | "sky130" | "nangate45";
 
 export interface SynthesizeOptions {
   verilogSources: string[];
   topModule: string;
-  target?: "generic" | "ice40" | "sky130" | "nangate45";
+  target?: YosysTarget;
   libertyFile?: string;
   flatten?: boolean;
   outputNetlist?: string;
@@ -41,8 +44,27 @@ export async function runYosysSynthesize(
   let activeLiberty = options.libertyFile;
   if (target === "ice40") {
     scriptParts.push(`synth_ice40 -top ${options.topModule}`);
+  } else if (target === "xilinx") {
+    scriptParts.push(`synth_xilinx -top ${options.topModule}`);
+  } else if (target === "intel") {
+    scriptParts.push(`synth_intel -top ${options.topModule}`);
   } else if (target === "sky130") {
-    scriptParts.push(`synth_sky130 -top ${options.topModule}`);
+    // Yosys 0.38 has no synth_sky130 and the image bakes no Sky130 PDK yet
+    // (see volare); fail honestly instead of emitting a doomed script.
+    return {
+      success: false,
+      topModule: options.topModule,
+      target,
+      cellCount: 0,
+      cellsByType: {},
+      wireCount: 0,
+      warnings: [],
+      errors: [
+        "Target 'sky130' needs a Sky130 PDK baked into the image, which is not installed yet. Use 'nangate45' or 'generic', or install the PDK with volare (see eda-docker-images).",
+      ],
+      rawStdout: "",
+      rawStderr: "",
+    };
   } else if (target === "nangate45") {
     if (!activeLiberty) {
       activeLiberty = "/opt/platforms/nangate45/NangateOpenCellLibrary_typical.lib";
@@ -102,8 +124,28 @@ export async function runYosysSynthesize(
 
   const isSuccess = execRes.exitCode === 0 && errors.length === 0;
 
+  // OpenROAD 2.0 rejects `output/reg` port redeclarations (STA-0164),
+  // silently unlinking the design. Strip them from emitted netlists.
+  if (isSuccess && options.outputNetlist) {
+    try {
+      const netPath = path.join(resolvedDir, options.outputNetlist);
+      const text = await fs.readFile(netPath, "utf-8");
+      const cleaned = stripPortRedeclarations(text, options.topModule);
+      if (cleaned !== text) {
+        await fs.writeFile(netPath, cleaned, "utf-8");
+        warnings.push("Removed OpenROAD-incompatible port redeclarations from netlist.");
+      }
+    } catch {
+      // Netlist post-processing is best-effort; synthesis already succeeded.
+    }
+  }
+
   const topModuleClean = options.topModule;
   const targetModule = statResult?.modules[topModuleClean] || statResult?.design;
+
+  const areaUm2 = activeLiberty
+    ? (targetModule?.area ?? parseChipArea(execRes.stdout, options.topModule))
+    : undefined;
 
   return {
     success: isSuccess,
@@ -112,6 +154,7 @@ export async function runYosysSynthesize(
     cellCount: targetModule?.numCells ?? 0,
     cellsByType: targetModule?.cellsByType ?? {},
     wireCount: targetModule?.numWires ?? 0,
+    ...(areaUm2 !== undefined ? { areaUm2 } : {}),
     warnings,
     errors,
     netlistPath: options.outputNetlist ? path.join(resolvedDir, options.outputNetlist) : undefined,

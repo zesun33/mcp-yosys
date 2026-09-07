@@ -8,6 +8,6 @@ export async function getYosysToolchainInfo(runner: ToolRunner): Promise<YosysTo
     runtime: runner.getRuntime(),
     image: runner.getRuntime() !== "host" ? runner.getImageName() : undefined,
     yosysVersion: yosysRes.stdout.trim() || "Unknown",
-    availableTargets: ["generic", "ice40", "sky130"],
+    availableTargets: ["generic", "ice40", "xilinx", "intel", "sky130", "nangate45"],
   };
 }

@@ -1,6 +1,7 @@
 import { YosysStatModule, YosysStatResult } from "./types.js";
 
 interface RawYosysModule {
+  area?: number;
   num_wires?: number;
   num_wire_bits?: number;
   num_pub_wires?: number;
@@ -24,6 +25,7 @@ function cleanModuleName(name: string): string {
 
 function transformModule(raw: RawYosysModule): YosysStatModule {
   return {
+    ...(typeof raw.area === "number" ? { area: raw.area } : {}),
     numWires: raw.num_wires ?? 0,
     numWireBits: raw.num_wire_bits ?? 0,
     numPubWires: raw.num_pub_wires ?? 0,
@@ -47,6 +49,22 @@ export function extractYosysWarnings(stdout: string, stderr: string): string[] {
   }
 
   return Array.from(new Set(warnings));
+}
+
+/**
+ * Parses `Chip area for module '<name>': <area>` lines emitted by
+ * `stat -liberty` (area in um^2). Returns undefined when no liberty ran.
+ */
+export function parseChipArea(output: string, topModule: string): number | undefined {
+  const cleanTop = topModule.startsWith("\\") ? topModule.slice(1) : topModule;
+  for (const line of output.split("\n")) {
+    const m = line.match(/Chip area for module '\\?([^']+)':\s*([\d.]+)/);
+    if (m && (m[1] === topModule || m[1] === cleanTop)) {
+      const area = parseFloat(m[2]);
+      if (!Number.isNaN(area)) return area;
+    }
+  }
+  return undefined;
 }
 
 export function parseYosysStatJson(output: string): YosysStatResult | null {
@@ -97,6 +115,7 @@ export function parseYosysStatJson(output: string): YosysStatResult | null {
     const design = parsed.design
       ? transformModule(parsed.design)
       : {
+          area: undefined,
           numWires: 0,
           numWireBits: 0,
           numPubWires: 0,
@@ -116,4 +135,56 @@ export function parseYosysStatJson(output: string): YosysStatResult | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Removes port redeclarations (`wire`/`reg` lines restating module ports)
+ * from Yosys `write_verilog` output. OpenROAD 2.0's Verilog frontend
+ * rejects the `output [N:0] x;` + `reg [N:0] x;` form (STA-0164), which
+ * silently unlinks the design and voids all downstream P&R results.
+ * Internal nets are never touched: only exact port-name matches go.
+ */
+export function stripPortRedeclarations(netlist: string, topModule: string): string {
+  const modRe = new RegExp(`module\\s+${topModule}\\s*\\(([\\s\\S]*?)\\)\\s*;`);
+  const m = netlist.match(modRe);
+  if (!m) return netlist;
+
+  const ports = new Set<string>();
+  let depth = 0;
+  let cur = "";
+  const parts: string[] = [];
+  for (const ch of m[1]) {
+    if (ch === "(" || ch === "[") depth += 1;
+    else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+    if (ch === "," && depth === 0) {
+      parts.push(cur);
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.trim()) parts.push(cur);
+
+  for (const rawPart of parts) {
+    let part = rawPart
+      .replace(/^(input|output|inout)\b\s*/, "")
+      .replace(/^(wire|reg|logic|signed|unsigned)\b\s*/, "")
+      .replace(/^\[[^\]]+\]\s*/, "")
+      .trim();
+    part = part
+      .replace(/^(wire|reg|logic|signed|unsigned)\b\s*/, "")
+      .replace(/^\[[^\]]+\]\s*/, "")
+      .trim();
+    const id = part.match(/^([A-Za-z_][A-Za-z0-9_$]*)/);
+    if (id) ports.add(id[1]);
+  }
+  if (ports.size === 0) return netlist;
+
+  return netlist
+    .split("\n")
+    .filter((line) => {
+      const dm = line.match(/^\s*(wire|reg)\s*(\[[^\]]+\]\s*)?([A-Za-z_][A-Za-z0-9_$]*)\s*;\s*$/);
+      return !(dm && ports.has(dm[3]));
+    })
+    .join("\n");
 }

@@ -31,7 +31,7 @@
   "runtime": "podman",
   "image": "localhost/zesun33/asic",
   "yosysVersion": "Yosys 0.38+92 (git sha1 84116c9a3)",
-  "availableTargets": ["generic", "ice40", "sky130"]
+  "availableTargets": ["generic", "ice40", "xilinx", "intel", "sky130", "nangate45"]
 }
 ```
 
@@ -97,8 +97,9 @@
 
 | Tool | Parameters | Engine | Description |
 | :--- | :--- | :--- | :--- |
-| `yosys_synthesize` | `verilog_sources: string[]`, `top_module: string`, `target?: "generic" \| "ice40" \| "sky130"`, `flatten?: boolean`, `output_netlist?: string`, `cwd?: string`, `timeout_ms?: number` | `yosys synth` | Synthesizes RTL design to generic logic gates, iCE40 FPGA, or Sky130 standard cells, returning structured cell counts. |
+| `yosys_synthesize` | `verilog_sources: string[]`, `top_module: string`, `target?: "generic" \| "ice40" \| "xilinx" \| "intel" \| "sky130" \| "nangate45"`, `flatten?: boolean`, `output_netlist?: string`, `cwd?: string`, `timeout_ms?: number` | `yosys synth` | Synthesizes RTL design to generic gates, iCE40/Xilinx/Intel FPGAs, or Nangate45 standard cells (with `areaUm2`), returning structured cell counts. `sky130` needs a baked PDK and errors honestly until one ships. |
 | `yosys_check_latch` | `verilog_sources: string[]`, `top_module: string`, `cwd?: string`, `timeout_ms?: number` | `yosys check` | Fast RTL elaboration pass to detect inferred transparent latches, combinational loops, and multiple drivers with source line numbers. |
+| `yosys_equiv` | `gold_sources: string[]`, `gate_netlist: string`, `top_module: string`, `cwd?: string`, `timeout_ms?: number` | `equiv_make -make_assert` + `sat -verify` | Proves combinational equivalence (EQUIVALENT / NOT_EQUIVALENT / INCONCLUSIVE; sequential and latch designs report INCONCLUSIVE, never a false pass). |
 | `yosys_hierarchy` | `verilog_sources: string[]`, `top_module: string`, `cwd?: string`, `timeout_ms?: number` | `yosys hierarchy` | Analyzes module instantiation tree and verifies that no submodules or blackboxes are missing. |
 | `yosys_toolchain_info` | *none* | Probe | Returns active container/host runtime and Yosys synthesis engine version. |
 
