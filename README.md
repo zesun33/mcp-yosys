@@ -16,7 +16,7 @@
 ### Why AI Agents Need `mcp-yosys`
 | Without `mcp-yosys` (Raw Yosys CLI) | With `mcp-yosys` (Structured MCP) |
 | :--- | :--- |
-| Dumps 500+ lines of techmap & ABC logs into context | Structured JSON with **< 100 tokens** of clean metrics |
+| Dumps 500+ lines of techmap & ABC logs into context | Structured JSON with **`< 100 tokens`** of clean metrics |
 | Inferred latches buried in intermediate RTLIL logs | Pinpointed latch alerts: `"variable": "q", "line": 8` |
 | Agent blindly guesses gate count and area footprint | Direct **cell breakdown** (`$_AND_`, `$_DFF_P_`, `$_XOR_`) |
 | Unresolved blackboxes silently fail downstream P&R | Explicit **`missingModules`** validation |
@@ -29,7 +29,7 @@
 // Tool Call: yosys_toolchain_info
 {
   "runtime": "podman",
-  "image": "localhost/zesun33/asic",
+  "image": "ghcr.io/zesun33/asic",
   "yosysVersion": "Yosys 0.38+92 (git sha1 84116c9a3)",
   "availableTargets": ["generic", "ice40", "xilinx", "intel", "sky130", "nangate45"]
 }
@@ -108,22 +108,29 @@
 
 ## Execution Runtime
 
-`mcp-yosys` automatically executes commands inside the [`zesun33/asic`](https://github.com/zesun33/eda-docker-images) rootless Podman container (`localhost/zesun33/asic`), ensuring consistent synthesis across any Linux host:
+`mcp-yosys` runs inside the [`zesun33/asic`](https://github.com/zesun33/eda-docker-images) rootless Podman image so tools are identical on any Linux host.
+
+**Public install (recommended — anyone can pull):**
+```bash
+podman pull ghcr.io/zesun33/asic:latest
+export MCP_YOSYS_IMAGE=ghcr.io/zesun33/asic
+```
+
+Local builds from `eda-docker-images` still work as `localhost/zesun33/asic` (the historical default). Override anytime with `MCP_YOSYS_IMAGE`.
+
 - Container mount: `-v <workspace>:/workspace:Z -w /workspace`
-- Yosys version: `0.38+92` with ABC integration
-- Rootless storage option: `--storage-opt overlay.ignore_chown_errors=true`
+- Podman storage option: `--storage-opt overlay.ignore_chown_errors=true`
 
-To configure a custom container image or force local host execution:
+To force host binaries instead of container execution:
 ```bash
-export MCP_YOSYS_IMAGE=localhost/zesun33/fpga    # Use FPGA image instead of ASIC
-export MCP_YOSYS_RUNTIME=host                    # Use host-installed yosys
+export MCP_YOSYS_RUNTIME=host
 ```
 
-For Sky130 synthesis, point the server at a host-side volare PDK (same convention as `mcp-gds`; never baked into images):
+Other useful overrides:
 ```bash
-export MCP_YOSYS_PDK_ROOT=/path/to/pdks/volare/sky130/versions/<sha>
+export MCP_YOSYS_IMAGE=ghcr.io/zesun33/fpga    # FPGA image instead of ASIC
 ```
-The PDK dir mounts at `/pdk` and `target: "sky130"` maps to `sky130_fd_sc_hd` (tt_100C_1v80 corner).
+
 
 ---
 
@@ -145,7 +152,7 @@ Add to your project's `.cursor/mcp.json` or `.windsurf/mcp.json`:
   "mcpServers": {
     "yosys": {
       "command": "node",
-      "args": ["/data/mxm6982/projects/personal-projects/mcp-yosys/dist/index.js"]
+      "args": ["/path/to/personal-projects/mcp-yosys/dist/index.js"]
     }
   }
 }
@@ -158,7 +165,7 @@ Add to your VS Code MCP settings or user configuration:
   "mcpServers": {
     "yosys": {
       "command": "node",
-      "args": ["/data/mxm6982/projects/personal-projects/mcp-yosys/dist/index.js"]
+      "args": ["/path/to/personal-projects/mcp-yosys/dist/index.js"]
     }
   }
 }
