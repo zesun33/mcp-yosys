@@ -19,7 +19,7 @@ export interface SynthesizeOptions {
 
 // Default Sky130 liberty: container path /pdk/... when a PDK is mounted,
 // host path when running on bare metal. Undefined when no PDK is visible.
-function defaultSky130Liberty(runner: ToolRunner): string | undefined {
+export function defaultSky130Liberty(runner: ToolRunner): string | undefined {
   const rel = "sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_100C_1v80.lib";
   if (runner.getRuntime() === "host") {
     const root = process.env.MCP_YOSYS_PDK_ROOT || process.env.PDK_ROOT || "";

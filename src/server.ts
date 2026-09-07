@@ -9,6 +9,7 @@ import { runYosysSynthesize } from "./tools/synthesize.js";
 import { runYosysCheckLatch } from "./tools/check.js";
 import { runYosysHierarchy } from "./tools/hierarchy.js";
 import { runYosysEquiv } from "./tools/equiv.js";
+import { runYosysWriteSpice } from "./tools/spice.js";
 import { getYosysToolchainInfo } from "./tools/toolchain.js";
 
 export function createServer(): Server {
@@ -162,6 +163,37 @@ export function createServer(): Server {
       },
     },
     {
+      name: "yosys_write_spice",
+      description:
+        "Converts a synthesized gate-level Verilog netlist to a hierarchical SPICE schematic for Netgen LVS: cell port order follows the PDK models (.include), unconnected supply pins tie to global supplies. Needs the Sky130 PDK (MCP_YOSYS_PDK_ROOT); errors honestly without one.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          netlist_file: {
+            type: "string",
+            description: "Synthesized gate-level Verilog netlist file path.",
+          },
+          top_module: {
+            type: "string",
+            description: "Name of the top-level module.",
+          },
+          liberty_file: {
+            type: "string",
+            description: "Optional Liberty file; must be sky130_fd_sc_hd (default resolves via MCP_YOSYS_PDK_ROOT).",
+          },
+          output_spice: {
+            type: "string",
+            description: "Optional output SPICE file path.",
+          },
+          cwd: {
+            type: "string",
+            description: "Working directory where files reside.",
+          },
+        },
+        required: ["netlist_file", "top_module"],
+      },
+    },
+    {
       name: "yosys_toolchain_info",
       description:
         "Returns active container/host runtime and version information for the Yosys synthesis engine.",
@@ -266,6 +298,20 @@ export function createServer(): Server {
 
       if (name === "yosys_toolchain_info") {
         const res = await getYosysToolchainInfo(runner);
+        return {
+          content: [{ type: "text", text: JSON.stringify(res, null, 2) }],
+        };
+      }
+
+      if (name === "yosys_write_spice") {
+        const res = await runYosysWriteSpice(runner, {
+          netlistFile: args.netlist_file as string,
+          topModule: args.top_module as string,
+          libertyFile: args.liberty_file as string | undefined,
+          outputSpice: args.output_spice as string | undefined,
+          cwd: args.cwd as string | undefined,
+        });
+
         return {
           content: [{ type: "text", text: JSON.stringify(res, null, 2) }],
         };

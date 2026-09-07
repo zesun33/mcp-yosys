@@ -7,6 +7,7 @@ import { runYosysSynthesize } from "../src/tools/synthesize.js";
 import { runYosysCheckLatch } from "../src/tools/check.js";
 import { runYosysHierarchy } from "../src/tools/hierarchy.js";
 import { runYosysEquiv } from "../src/tools/equiv.js";
+import { runYosysWriteSpice } from "../src/tools/spice.js";
 import { getYosysToolchainInfo } from "../src/tools/toolchain.js";
 
 const runner = new ToolRunner();
@@ -193,4 +194,53 @@ test("Integration: yosys_equiv is inconclusive on sequential counter", async () 
 
   assert.equal(res.verdict, "INCONCLUSIVE");
   assert.equal(res.success, false);
+});
+
+pdkIt("Integration (PDK): yosys_write_spice emits hierarchical LVS schematic", async () => {
+  const synth = await runYosysSynthesize(new ToolRunner(), {
+    verilogSources: ["counter.v"],
+    topModule: "counter",
+    target: "sky130",
+    outputNetlist: "counter_spice_tmp.v",
+    cwd: fixturesDir,
+  });
+  assert.equal(synth.success, true, `sky130 synth failed: ${synth.errors.join("; ")}`);
+  try {
+    const res = await runYosysWriteSpice(new ToolRunner(), {
+      netlistFile: "counter_spice_tmp.v",
+      topModule: "counter",
+      outputSpice: "counter_spice_tmp.spice",
+      cwd: fixturesDir,
+    });
+    assert.equal(res.success, true, `write_spice failed: ${res.errors.join("; ")}`);
+    assert.ok(res.cellCount > 0, "expected cells");
+    const text = await fs.readFile(path.join(fixturesDir, "counter_spice_tmp.spice"), "utf-8");
+    assert.ok(text.includes(".include"), "expected PDK .include");
+    assert.ok(text.includes("sky130_fd_sc_hd.spice"), "expected PDK model path");
+    assert.ok(/^\.subckt counter /m.test(text), "expected top subckt");
+    assert.ok(text.includes("X"), "expected instances");
+    assert.ok(text.trimEnd().endsWith(".ends"), "expected .ends");
+  } finally {
+    await fs.rm(path.join(fixturesDir, "counter_spice_tmp.v"), { force: true });
+    await fs.rm(path.join(fixturesDir, "counter_spice_tmp.spice"), { force: true });
+  }
+});
+
+test("Integration: yosys_write_spice rejects without a visible PDK", async () => {
+  const savedYosys = process.env.MCP_YOSYS_PDK_ROOT;
+  const savedShared = process.env.PDK_ROOT;
+  delete process.env.MCP_YOSYS_PDK_ROOT;
+  delete process.env.PDK_ROOT;
+  try {
+    const res = await runYosysWriteSpice(new ToolRunner(), {
+      netlistFile: "counter.v",
+      topModule: "counter",
+      cwd: fixturesDir,
+    });
+    assert.equal(res.success, false);
+    assert.ok(res.errors.some((e) => e.includes("MCP_YOSYS_PDK_ROOT")), `Expected PDK guidance, got: ${res.errors.join("; ")}`);
+  } finally {
+    if (savedYosys !== undefined) process.env.MCP_YOSYS_PDK_ROOT = savedYosys;
+    if (savedShared !== undefined) process.env.PDK_ROOT = savedShared;
+  }
 });
