@@ -1,6 +1,6 @@
 {
   "name": "@zesun33/mcp-yosys",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Model Context Protocol (MCP) server for Yosys RTL synthesis, cell statistics, and latch triage",
   "type": "module",
   "bin": {
@@ -26,7 +26,8 @@
   },
   "license": "Apache-2.0",
   "files": [
-    "dist"
+    "dist",
+    "platforms"
   ],
   "publishConfig": {
     "access": "public"
