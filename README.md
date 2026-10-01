@@ -9,6 +9,16 @@
 
 `mcp-yosys` equips AI coding agents and IDEs (**Cursor**, **Windsurf**, **GitHub Copilot / OpenAI Codex**, **Claude Code**, **Google Antigravity**, **OpenCode**, **Cline**) with structured tools to synthesize Verilog/SystemVerilog designs, inspect cell hierarchies, and triage synthesis hazards (such as unintended transparent latches and combinational loops) before committing code to ASIC or FPGA physical design flows.
 
+## Install and run
+
+Run this MCP server directly from npm:
+
+```bash
+npx -y @zesun33/mcp-yosys
+```
+
+For the complete hardware-agent setup, use `npx -y @zesun33/create-hw-agent my-asic`.
+
 ---
 
 ## ⚡ Quick Tour: See It in Action
