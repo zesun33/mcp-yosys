@@ -212,3 +212,7 @@ Run specific test tiers:
 npm run test:unit       # Fast unit tests (parsers & contract)
 npm test                # Full test suite (including live container synthesis)
 ```
+
+## npm releases
+
+See [RELEASING.md](https://github.com/zesun33/mcp-yosys/blob/main/RELEASING.md) for GitHub Actions dry runs and trusted publishing.
