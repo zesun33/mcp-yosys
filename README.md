@@ -1,5 +1,26 @@
 # @zesun33/mcp-yosys
 
+<!-- BEGIN GENERATED PROJECT GUIDE -->
+
+## Purpose and first steps
+
+Inspect synthesis, hierarchy, and unintended latches before physical design through an MCP server.
+
+**Who it is for:** Hardware engineers using an MCP-capable client or coding agent.
+
+**First task:** Configure the server in your MCP client, then call `yosys_toolchain_info` before running a design.
+
+**What to expect:** Tool availability, then synthesis statistics, hierarchy, and latch diagnostics.
+
+**Current scope:** Published MCP server. The npx command starts a stdio server that waits for a client; EDA execution also needs its documented host/container tools.
+
+**Start here:** [Runtime requirements and configuration](README.md#execution-runtime).
+
+**Related projects:** [mcp-verilog](https://github.com/zesun33/mcp-verilog), [mcp-openroad](https://github.com/zesun33/mcp-openroad).
+
+[Choose another project](https://github.com/zesun33/personal-projects/blob/main/GETTING_STARTED.md).
+<!-- END GENERATED PROJECT GUIDE -->
+
 > Model Context Protocol (MCP) server for open-source RTL synthesis, cell statistics, and latch triage via [Yosys](https://yosyshq.net/yosys/).
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
@@ -23,6 +44,8 @@ For the complete hardware-agent setup, use `npx -y @zesun33/create-hw-agent my-a
 
 ## ⚡ Quick Tour: See It in Action
 
+The examples below illustrate tool requests and result fields. Timings, counts, and scores depend on the input and runtime; they are not guaranteed outcomes or fresh verification results.
+
 ### Why AI Agents Need `mcp-yosys`
 | Without `mcp-yosys` (Raw Yosys CLI) | With `mcp-yosys` (Structured MCP) |
 | :--- | :--- |
@@ -32,7 +55,7 @@ For the complete hardware-agent setup, use `npx -y @zesun33/create-hw-agent my-a
 | Unresolved blackboxes silently fail downstream P&R | Explicit **`missingModules`** validation |
 | Requires manual installation of Yosys, ABC, and libs | **Zero host configuration** (runs via isolated rootless Podman) |
 
-### Real Agent Scenarios in 60 Seconds
+### Example tool requests and results
 
 #### 1. Probing the Environment (Zero-Config Verification)
 ```json
